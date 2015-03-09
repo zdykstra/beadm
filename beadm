@@ -39,7 +39,7 @@ PATH=${PATH}:/bin:/usr/bin:/usr/local/bin:/sbin:/usr/sbin:/usr/local/sbin
 
 if [ "${1}" = "--version" -o "${1}" = "version" ]
 then
-  echo "beadm 1.0 2013/10/13"
+  echo "beadm 1.2.2 (2015-03-09)"
   exit 0
 fi
 
@@ -197,6 +197,11 @@ if [ -z "${BOOTFS}" -o "${BOOTFS}" = "-" ]
 then
  echo "ERROR: ZFS boot pool '${POOL}' has unset 'bootfs' property"
  exit 1
+fi
+
+if [ -f /etc/conf.d/beadm ]
+then
+  . /etc/conf.d/beadm
 fi
 
 if [ -f /etc/beadm.conf ]
