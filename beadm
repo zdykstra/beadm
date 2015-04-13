@@ -784,6 +784,100 @@ EOF
     echo "${TARGET}"
     ;;
 
+  (bind) # -------------------------------------------------------------
+    if [ ${#} -gt 1 ]
+    then
+      TARGET=${2}
+    else
+      __usage
+    fi
+    shift 2
+    __be_exist "${POOL}/${BEDS}/${TARGET}"
+    if __be_mounted "${POOL}/${BEDS}/${TARGET}"
+    then
+      MNT=$( mount | awk '$1=="'"${POOL}/${BEDS}/${TARGET}"'" {print $3}' )
+      if [ ${#} -eq 0 ]
+      then
+        set -- ${BIND_COMPS:-proc sys dev}
+      fi
+      comp=${1}
+      while shift
+      do
+        case ${comp} in
+          (proc)
+            mount -t proc proc ${MNT}/proc
+          ;;
+          (sys|dev)
+            mount --rbind /${comp} ${MNT}/${comp}
+            mount --make-rslave ${MNT}/${comp}
+          ;;
+          (src=*)
+            src=${comp#src=}
+            set -- src "$@"
+          ;;
+          (src)
+            zfs set mountpoint=${MNT}/usr/src ${src:=${BIND_SRC:-system/usr/src}}
+            zfs mount ${src}
+          ;;
+          (boot=*)
+            boot=${comp#boot=}
+            set -- boot "$@"
+          ;;
+          (boot)
+            mount ${boot:=$(awk '$2=="/boot" {print $1}' /etc/fstab)} ${MNT}/boot
+          ;;
+        esac
+        comp=${1}
+      done
+    else
+      echo "ERROR: '${TARGET}' is not mounted"
+      exit 1
+    fi
+    ;;
+
+  (ubind|unbind) # -------------------------------------------------------------
+    if [ ${#} -gt 1 ]
+    then
+      TARGET=${2}
+    else
+      __usage
+    fi
+    shift 2
+    __be_exist "${POOL}/${BEDS}/${TARGET}"
+    if __be_mounted "${POOL}/${BEDS}/${TARGET}"
+    then
+      MNT=$( mount | awk '$1=="'"${POOL}/${BEDS}/${TARGET}"'" {print $3}' )
+      if [ ${#} -eq 0 ]
+      then
+        set -- ${BIND_COMPS:-proc sys dev}
+      fi
+      comp=${1}
+      while shift
+      do
+        case ${comp} in
+          (proc|sys|dev)
+            umount -l ${MNT}/${comp}
+          ;;
+          (src=*)
+            src=${comp#src=}
+            set -- src "$@"
+          ;;
+          (src)
+            zfs umount ${src:=${BIND_SRC:-system/usr/src}}
+            zfs inherit mountpoint ${src}
+          ;;
+          (boot|boot=*)
+            umount ${MNT}/boot
+          ;;
+        esac
+        comp=${1}
+      done
+    else
+      echo "ERROR: '${TARGET}' is not mounted"
+      exit 1
+    fi
+    ;;
+
   (umount|unmount) # ----------------------------------------------------------
     if [ ${#} -eq 2 ]
     then
