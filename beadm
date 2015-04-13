@@ -86,7 +86,12 @@ __be_snapshot() { # 1=DATASET/SNAPSHOT
 
 # check if boot environment is mounted
 __be_mounted() { # 1=BE
-  mount 2> /dev/null | grep -q -E "^${1} " 2> /dev/null
+  findmnt --first-only --source "${1}" > /dev/null
+}
+
+# find mount point of boot environment
+__be_findmnt() { # 1=BE
+  echo declare $(findmnt -fPS "${1}")\; echo \$TARGET | sh
 }
 
 # check if boot environment is a clone
@@ -471,12 +476,12 @@ case ${1} in
     else
       if __be_mounted ${POOL}/${BEDS}/${2}
       then
-        MNT=$( mount | grep -E "^${POOL}/${BEDS}/${2} " | awk '{print $3}' )
+        MNT=$(__be_findmnt "${POOL}/${BEDS}/${2}")
         if [ "${MNT}" != "/" ]
         then
           # boot environment is not current root and its mounted
           echo "Attempt to unmount boot environment '${2}' mounted at '${MNT}'"
-          if ! umount ${MNT} 1> /dev/null 2> /dev/null
+          if ! umount "${MNT}" 1> /dev/null 2> /dev/null
           then
             echo "ERROR: Unable to unmount boot environment '${2}' mounted at '${MNT}'"
             echo "ERROR: Cannot activate manually mounted boot environment '${2}'"
@@ -499,7 +504,7 @@ case ${1} in
         do
           if [ "${FS}" = "${POOL}/${BEDS}/${2}" ]
           then
-            MOUNT=${MNT}
+            MOUNT="${MNT}"
             break
           fi
         done << EOF
@@ -735,7 +740,7 @@ EOF
     __be_exist "${POOL}/${BEDS}/${2}"
     if __be_mounted "${POOL}/${BEDS}/${2}"
     then
-      MNT=$( mount | grep -E "^${POOL}/${BEDS}/${2} " | awk '{print $3}' )
+      MNT=$(__be_findmnt "${POOL}/${BEDS}/${2}")
       echo "${MNT}"
       exit 1
     fi
@@ -795,40 +800,68 @@ EOF
     __be_exist "${POOL}/${BEDS}/${TARGET}"
     if __be_mounted "${POOL}/${BEDS}/${TARGET}"
     then
-      MNT=$( mount | awk '$1=="'"${POOL}/${BEDS}/${TARGET}"'" {print $3}' )
+      MNT=$(__be_findmnt "${POOL}/${BEDS}/${TARGET}")
       if [ ${#} -eq 0 ]
       then
-        set -- ${BIND_COMPS:-proc sys dev}
+        set -- ${BIND_COMPS:-proc sys dev tmp}
       fi
       comp=${1}
       while shift
       do
         case ${comp} in
           (proc)
-            mount -t proc proc ${MNT}/proc
+            mount -t proc proc "${MNT}/proc"
           ;;
           (sys|dev)
-            mount --rbind /${comp} ${MNT}/${comp}
-            mount --make-rslave ${MNT}/${comp}
-          ;;
-          (src=*)
-            src=${comp#src=}
-            set -- src "$@"
-          ;;
-          (src)
-            zfs set mountpoint=${MNT}/usr/src ${src:=${BIND_SRC:-system/usr/src}}
-            zfs mount ${src}
-          ;;
-          (boot=*)
-            boot=${comp#boot=}
-            set -- boot "$@"
+            mount --rbind "/${comp}" "${MNT}/${comp}"
+            mount --make-rslave "${MNT}/${comp}"
           ;;
           (boot)
-            mount ${boot:=$(awk '$2=="/boot" {print $1}' /etc/fstab)} ${MNT}/boot
+            if ! findmnt -f /boot > /dev/null
+            then
+              mount /boot
+            fi
+            mount --bind /boot "${MNT}/boot"
+          ;;
+          (*)
+            mount --bind "/${comp}" "${MNT}/${comp}"
           ;;
         esac
         comp=${1}
       done
+    else
+      echo "ERROR: '${TARGET}' is not mounted"
+      exit 1
+    fi
+    ;;
+
+  (chroot) # -------------------------------------------------------------------
+    if [ ${#} -eq 2 ]
+    then
+      TARGET=${2}
+    else
+      __usage
+    fi
+    __be_exist "${POOL}/${BEDS}/${2}"
+    if __be_mounted "${POOL}/${BEDS}/${2}"
+    then
+      MNT=$(__be_findmnt "${POOL}/${BEDS}/${TARGET}")
+      TMPRC=$(mktemp --tmpdir=/tmp BE-${2}.XXX)
+      if [ -r "${RCFILE:=$HOME/.bashrc}" ]
+      then
+        cp "${RCFILE}" ${TMPRC}
+      else
+        echo "Warning: unable to read ${RCFILE}"
+      fi
+      cat >> ${TMPRC} << EOF
+        env-update
+        . /etc/profile
+        export PS1="[$TARGET] \$PS1"
+EOF
+      ionice -c3 -p $$ | sed 's/^/    /'
+      renice -n 20 -p $$ | sed 's/^/    /'
+      /usr/bin/chroot "${MNT}" ${SHELL:-/bin/bash} --rcfile ${TMPRC}
+      rm ${TMPRC}
     else
       echo "ERROR: '${TARGET}' is not mounted"
       exit 1
@@ -846,28 +879,20 @@ EOF
     __be_exist "${POOL}/${BEDS}/${TARGET}"
     if __be_mounted "${POOL}/${BEDS}/${TARGET}"
     then
-      MNT=$( mount | awk '$1=="'"${POOL}/${BEDS}/${TARGET}"'" {print $3}' )
+      MNT=$(__be_findmnt "${POOL}/${BEDS}/${TARGET}")
       if [ ${#} -eq 0 ]
       then
-        set -- ${BIND_COMPS:-proc sys dev}
+        set -- ${BIND_COMPS:-proc sys dev tmp}
       fi
       comp=${1}
       while shift
       do
         case ${comp} in
-          (proc|sys|dev)
-            umount -l ${MNT}/${comp}
+          (proc|sys|dev|tmp)
+            umount -l "${MNT}/${comp}"
           ;;
-          (src=*)
-            src=${comp#src=}
-            set -- src "$@"
-          ;;
-          (src)
-            zfs umount ${src:=${BIND_SRC:-system/usr/src}}
-            zfs inherit mountpoint ${src}
-          ;;
-          (boot|boot=*)
-            umount ${MNT}/boot
+          (*)
+            umount "${MNT}/${comp}"
           ;;
         esac
         comp=${1}
