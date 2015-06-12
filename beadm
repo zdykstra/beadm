@@ -488,7 +488,7 @@ case ${1} in
       # do not change root (/) mounted boot environment mountpoint
       if [ "${ROOTFS}" != "${POOL}/${BEDS}/${2}" ]
       then
-        TMPMNT=$( mktemp -d -t BE-${2}.XXX )
+        TMPMNT=$( mktemp -d -p /mnt BE-${2}.XXX )
         if ! mkdir -p ${TMPMNT} 2> /dev/null
         then
           echo "ERROR: Cannot create '${TMPMNT}' directory"
@@ -725,7 +725,7 @@ EOF
   (mount) # ------------------------------------------------------------
     if [ ${#} -eq 2 ]
     then
-      TARGET=$( mktemp -d -t BE-${2}.XXX )
+      TARGET=$( mktemp -d -p /mnt BE-${2}.XXX )
     elif [ ${#} -eq 3 ]
     then
       TARGET=${3}
