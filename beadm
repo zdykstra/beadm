@@ -204,6 +204,9 @@ then
  exit 1
 fi
 
+#acitve BE
+BE=$( echo ${ROOTFS} | awk -F '/' '{print $(NF)}' )
+
 if [ -f /etc/conf.d/beadm ]
 then
   . /etc/conf.d/beadm
@@ -218,7 +221,9 @@ fi
 : ${GRUB="NO"}
 
 # use other prefix then the 'pool/ROOT/bename' default
-: ${BEDS="$( echo ${ROOTFS} | awk -F '/' '{print $2}' )"}
+# more agile methode to support more nested paths like 'pool/enc/ROOT/bename'
+BES="${ROOTFS/$POOL\//}"
+BES="${BES/\/$BE/}"
 
 case ${1} in
 
@@ -749,9 +754,11 @@ EOF
       echo "ERROR: Cannot create '${TARGET}' mountpoint"
       exit 1
     fi
+    zfs set mountpoint=legacy ${POOL}/${BEDS}/${2}
     if ! mount -t zfs ${POOL}/${BEDS}/${2} ${TARGET}
     then
       echo "ERROR: Cannot mount '${2}' at '${TARGET}' mountpoint"
+      zfs set mountpoint=/ ${POOL}/${BEDS}/${2}
       exit 1
     fi
     zfs list -H -o name,mountpoint -r ${POOL}/${BEDS}/${2} \
@@ -933,6 +940,8 @@ EOF
           then
             echo "ERROR: Cannot umount '${FS}' dataset"
             exit 1
+          else
+            zfs set mountpoint=/ ${POOL}/${BEDS}/${2}
           fi
         done
     echo "Unmounted successfully"
