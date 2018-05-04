@@ -222,8 +222,8 @@ fi
 
 # use other prefix then the 'pool/ROOT/bename' default
 # more agile methode to support more nested paths like 'pool/enc/ROOT/bename'
-BES="${ROOTFS/$POOL\//}"
-BES="${BES/\/$BE/}"
+BEDS="${ROOTFS/$POOL\//}"
+BEDS="${BEDS/\/$BE/}"
 
 case ${1} in
 
