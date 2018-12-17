@@ -168,9 +168,9 @@ EOF
         fi
         if __be_snapshot ${1}
         then
-          eval "zfs clone -o canmount=off ${OPTS} ${FS}@${1##*@} ${DATASET}"
+          eval "zfs clone -o canmount=noauto ${OPTS} ${FS}@${1##*@} ${DATASET}"
         else
-          eval "zfs clone -o canmount=off ${OPTS} ${FS}@${FMT} ${DATASET}"
+          eval "zfs clone -o canmount=noatuo ${OPTS} ${FS}@${FMT} ${DATASET}"
         fi
       done
       # check if we need to update grub
@@ -538,7 +538,7 @@ EOF
         if [ ${MOUNT} -eq 0 ]
         then
           zfs umount ${POOL}/${BEDS}/${2}
-          zfs set mountpoint=legacy ${POOL}/${BEDS}/${2}
+          zfs set mountpoint=/ ${POOL}/${BEDS}/${2}
         fi
       fi
       if ! zpool set bootfs=${POOL}/${BEDS}/${2} ${POOL} 1> /dev/null 2> /dev/null
@@ -754,7 +754,7 @@ EOF
       echo "ERROR: Cannot create '${TARGET}' mountpoint"
       exit 1
     fi
-    zfs set mountpoint=legacy ${POOL}/${BEDS}/${2}
+    zfs set mountpoint=/ ${POOL}/${BEDS}/${2}
     if ! mount -t zfs ${POOL}/${BEDS}/${2} ${TARGET}
     then
       echo "ERROR: Cannot mount '${2}' at '${TARGET}' mountpoint"
