@@ -170,7 +170,7 @@ EOF
         then
           eval "zfs clone -o canmount=noauto ${OPTS} ${FS}@${1##*@} ${DATASET}"
         else
-          eval "zfs clone -o canmount=noatuo ${OPTS} ${FS}@${FMT} ${DATASET}"
+          eval "zfs clone -o canmount=noauto ${OPTS} ${FS}@${FMT} ${DATASET}"
         fi
       done
       # check if we need to update grub
@@ -563,7 +563,6 @@ EOF
       | grep -E "^${POOL}/${BEDS}/${2}(/|$)" \
       | while read NAME
         do
-          #zfs set canmount=on ${NAME}
           while __be_clone ${NAME}
           do
             zfs promote ${NAME}
