@@ -754,7 +754,7 @@ EOF
       echo "ERROR: Cannot create '${TARGET}' mountpoint"
       exit 1
     fi
-    zfs set mountpoint=/ ${POOL}/${BEDS}/${2}
+    zfs set mountpoint=legacy ${POOL}/${BEDS}/${2}
     if ! mount -t zfs ${POOL}/${BEDS}/${2} ${TARGET}
     then
       echo "ERROR: Cannot mount '${2}' at '${TARGET}' mountpoint"
